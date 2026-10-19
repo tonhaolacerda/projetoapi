@@ -8,7 +8,7 @@ const contas = [], categorias = [], lancamentos = [];
 const erro = (res, status, erro) => res.status(status).json({ erro });
 const novo = (lista, dados) => {
   const item = { id: Math.max(0, ...lista.map((x) => x.id)) + 1, ...dados };
-  lista.push(item);
+  lista.push(item); 
   return item;
 };
 const achar = (lista, id) => lista.find((x) => x.id === Number(id));
@@ -19,6 +19,12 @@ const saldo = (conta) =>
     .reduce((s, l) => s + (l.tipo === 'receita' ? l.valor : -l.valor), conta.saldo_inicial);
 
 app.get('/contas', (req, res) => res.json(contas.map((c) => ({ ...c, saldo: saldo(c) }))));
+
+app.get('/contas/:id', (req, res) => {
+  const conta = achar(contas, req.params.id);
+  if (!conta) return erro(res, 404, 'Conta não encontrada');
+  res.json({ ...conta, saldo: saldo(conta) });
+});
 
 app.post('/contas', (req, res) => {
   const { nome, saldo_inicial = 0 } = req.body ?? {};
@@ -42,12 +48,27 @@ app.delete('/contas/:id', (req, res) => {
 });
 
 app.get('/categorias', (req, res) => res.json(categorias));
+
+app.get('/categorias/:id', (req, res) => {
+  const categoria = achar(categorias, req.params.id);
+  if (!categoria) return erro(res, 404, 'Categoria não encontrada');
+  res.json(categoria);
+});
+
 app.post('/categorias', (req, res) => {
   if (!req.body?.nome) return erro(res, 400, 'Informe o nome');
   res.status(201).json(novo(categorias, { nome: req.body.nome }));
 });
 
+
 app.get('/lancamentos', (req, res) => res.json(lancamentos));
+
+app.get('/lancamentos/:id', (req, res) => {
+  const l = achar(lancamentos, req.params.id);
+  if (!l) return erro(res, 404, 'Lançamento não encontrado');
+  res.json(l);
+});
+
 app.post('/lancamentos', (req, res) => {
   const { conta_id, categoria_id, tipo, valor, descricao = '' } = req.body ?? {};
   const conta = achar(contas, conta_id);
@@ -69,9 +90,12 @@ app.put('/lancamentos/:id', (req, res) => {
 app.delete('/lancamentos/:id', (req, res) => {
   const l = achar(lancamentos, req.params.id);
   if (!l) return erro(res, 404, 'Lançamento não encontrado');
+  
   if (l.tipo === 'receita' && saldo(achar(contas, l.conta_id)) - l.valor < 0) {
     return erro(res, 422, 'Não pode excluir, a conta ficaria negativa'); 
   }
+  
+  lancamentos.splice(lancamentos.indexOf(l), 1);
   res.status(204).end();
 });
 
